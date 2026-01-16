@@ -3,6 +3,7 @@ package main
 import (
 	"os"
 	"path"
+	"soloboard/components"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/termenv"
@@ -31,18 +32,6 @@ type Board struct {
 	Sections []Section
 }
 
-type PageSelectBoard struct {
-	boards []Board
-
-	title    string
-	editing  bool
-	selected int
-	db       BoardDatabase
-
-	w int
-	h int
-}
-
 func main() {
 	dbpath := os.ExpandEnv("$HOME/.local/share/soloboard")
 	if err := os.MkdirAll(dbpath, 0755); err != nil {
@@ -67,7 +56,10 @@ func main() {
 	o.SetCursorColor(termenv.ANSIWhite)
 	o.SetForegroundColor(termenv.ANSIWhite)
 
-	p := tea.NewProgram(PageSelectBoard{db: NewBoardDatabase(dbfilename)})
-	p.Run()
+	p := tea.NewProgram(PageSelectBoard{db: NewBoardDatabase(dbfilename), vp: components.NewViewport(Boxed(nil))})
+	_, err := p.Run()
+	if err != nil {
+		panic(err)
+	}
 
 }
