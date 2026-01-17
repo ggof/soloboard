@@ -1,26 +1,21 @@
 package components
 
 import (
-	"github.com/charmbracelet/lipgloss"
+	"iter"
 )
 
-type List interface {
-	RenderItem(i int, selected bool) string
-	Len() int
-}
-
 type Viewport struct {
-	I    int
-	beg  int
-	end  int
-	max  int
-	w    int
-	h    int
-	list List
+	I   int
+	beg int
+	end int
+	max int
+	h   int
+	iht int
+	len int
 }
 
-func NewViewport(list List) *Viewport {
-	return &Viewport{list: list}
+func NewViewport(length int, itemHeight int) *Viewport {
+	return &Viewport{len: length, iht: itemHeight}
 }
 
 func (v *Viewport) Up() {
@@ -29,7 +24,6 @@ func (v *Viewport) Up() {
 
 		for v.I < v.beg {
 			v.beg--
-
 			for v.end-v.beg > v.max {
 				v.end--
 			}
@@ -38,12 +32,11 @@ func (v *Viewport) Up() {
 }
 
 func (v *Viewport) Down() {
-	if v.I < v.list.Len()-1 {
+	if v.I < v.len-1 {
 		v.I++
 
 		for v.I >= v.end {
 			v.end++
-
 			for v.end-v.beg > v.max {
 				v.beg++
 			}
@@ -51,23 +44,22 @@ func (v *Viewport) Down() {
 	}
 }
 
-func (v *Viewport) SetSize(w, h int) {
-	v.w, v.h = w, h
+func (v *Viewport) SetSize(h int) {
+	v.h = h
 	v.updateViewportSize()
 }
 
-func (v *Viewport) SetList(list List) {
-	v.list = list
+func (v *Viewport) SetLen(length int) {
+	v.len = length
 	v.updateViewportSize()
 }
 
 func (v *Viewport) updateViewportSize() {
-	if v.list.Len() == 0 {
+	if v.len == 0 {
 		return
 	}
 
-	itemHeight := lipgloss.Height(v.list.RenderItem(0, false))
-	v.max = max(1, v.h/(itemHeight+1)) // count some margin, show at least 1 item
+	v.max = max(1, v.h/(v.iht+1)) // count some margin, show at least 1 item
 
 	v.beg = v.I
 	v.end = v.I
@@ -75,11 +67,11 @@ func (v *Viewport) updateViewportSize() {
 		if i%2 == 0 {
 			if v.beg > 0 {
 				v.beg--
-			} else if v.end < v.list.Len() {
+			} else if v.end < v.len {
 				v.end++
 			}
 		} else {
-			if v.end < v.list.Len() {
+			if v.end < v.len {
 				v.end++
 			} else if v.beg > 0 {
 				v.beg--
@@ -88,17 +80,12 @@ func (v *Viewport) updateViewportSize() {
 	}
 }
 
-func (v Viewport) Render() string {
-	var items []string
-	for i := v.beg; i < v.end; i++ {
-		items = append(items, v.list.RenderItem(i, i == v.I))
+func (v Viewport) Window() iter.Seq[int] {
+	return func(yield func(int) bool) {
+		for i := v.beg; i < v.end; i++ {
+			if !yield(i) {
+				return
+			}
+		}
 	}
-
-	return lipgloss.Place(
-		v.w,
-		v.h,
-		lipgloss.Center,
-		lipgloss.Center,
-		lipgloss.JoinVertical(lipgloss.Center, items...),
-	)
 }

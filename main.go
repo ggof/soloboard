@@ -56,7 +56,7 @@ func main() {
 	o.SetCursorColor(termenv.ANSIWhite)
 	o.SetForegroundColor(termenv.ANSIWhite)
 
-	p := tea.NewProgram(PageSelectBoard{db: NewBoardDatabase(dbfilename), vp: components.NewViewport(Boxed(nil))})
+	p := tea.NewProgram(PageSelectBoard{db: NewBoardDatabase(dbfilename), vp: components.NewViewport(0, 5)}, tea.WithoutCatchPanics())
 	_, err := p.Run()
 	if err != nil {
 		panic(err)

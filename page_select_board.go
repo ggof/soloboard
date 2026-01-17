@@ -22,7 +22,6 @@ type PageSelectBoard struct {
 
 func (p PageSelectBoard) Init() tea.Cmd {
 	return func() tea.Msg {
-		// TODO: fetch boards from sqlite
 		boards, err := p.db.Read()
 		if err != nil {
 			panic(err)
@@ -35,7 +34,7 @@ func (p PageSelectBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case []Board:
 		p.boards = msg
-		p.vp.SetList(Boxed(p.boards))
+		p.vp.SetLen(len(p.boards) + 1)
 	case tea.KeyMsg:
 		key := msg.String()
 		switch key {
@@ -51,7 +50,7 @@ func (p PageSelectBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		p.w = msg.Width
 		p.h = msg.Height
-		p.vp.SetSize(p.w, p.h)
+		p.vp.SetSize(2 * p.h / 3)
 	}
 	return p, nil
 }
@@ -69,7 +68,7 @@ func (p PageSelectBoard) handleInsertMode(key string) (tea.Model, tea.Cmd) {
 		p.boards = append(p.boards, Board{Name: p.title, Sections: []Section{{Name: "TODO"}, {Name: "IN PROGRESS"}, {Name: "DONE"}}})
 		p.title = ""
 		p.insertMode = false
-		p.vp.SetList(Boxed(p.boards))
+		p.vp.SetLen(len(p.boards) + 1)
 		cmd = p.saveBoards()
 	case key == "backspace":
 		if p.title != "" {
@@ -90,7 +89,7 @@ func (p PageSelectBoard) handleNormalMode(key string) (tea.Model, tea.Cmd) {
 	case "d", "x":
 		if p.vp.I < len(p.boards) {
 			p.boards = slices.Delete(p.boards, p.vp.I, p.vp.I+1)
-			p.vp.SetList(Boxed(p.boards))
+			p.vp.SetLen(len(p.boards) + 1)
 			cmd = p.saveBoards()
 		}
 	case "enter":
@@ -105,7 +104,44 @@ func (p PageSelectBoard) handleNormalMode(key string) (tea.Model, tea.Cmd) {
 }
 
 func (p PageSelectBoard) View() string {
-	return lipgloss.Place(p.w, p.h, lipgloss.Center, lipgloss.Center, p.vp.Render())
+	w := max(40, p.w/3)
+	d := lipgloss.NewStyle().
+		Align(lipgloss.Center, lipgloss.Center).
+		Border(lipgloss.RoundedBorder()).
+		Padding(1).
+		MarginBottom(1).
+		Width(w)
+
+	s := d.BorderForeground(ColorLightBlue)
+
+	var elems []string
+
+	for i := range p.vp.Window() {
+		ss := d
+		if p.vp.I == i {
+			ss = s
+			if i == len(p.boards) {
+				ss = ss.BorderForeground(ColorPurple)
+			}
+		}
+
+		var text string
+
+		if i == len(p.boards) {
+			if p.insertMode {
+				ss = ss.Align(lipgloss.Left)
+				text = ellipsisBeg(p.title, w-3) + "|"
+			} else {
+				text = "New board"
+			}
+		} else {
+			text = ellipsisEnd(p.boards[i].Name, w-2)
+		}
+
+		elems = append(elems, ss.Render(text))
+	}
+
+	return lipgloss.Place(p.w, p.h, lipgloss.Center, lipgloss.Center, lipgloss.JoinVertical(lipgloss.Center, elems...))
 }
 
 func (p PageSelectBoard) saveBoards() tea.Cmd {
@@ -118,34 +154,20 @@ func (p PageSelectBoard) saveBoards() tea.Cmd {
 	}
 }
 
-type boardRenderer struct {
-	boards        []Board
-	defaultStyle  lipgloss.Style
-	selectedStyle lipgloss.Style
+func ellipsisBeg(text string, w int) string {
+	if len(text) > w {
+		tbs := []byte(text[len(text)-w:])
+		copy(tbs[0:3], "...")
+		text = string(tbs)
+	}
+	return text
 }
 
-func (b boardRenderer) Len() int { return len(b.boards) + 1 } // account for the "new board" box
-
-func (b boardRenderer) RenderItem(i int, selected bool) string {
-	s := b.defaultStyle
-	if selected {
-		s = b.selectedStyle
+func ellipsisEnd(text string, w int) string {
+	if len(text) > w {
+		tbs := []byte(text[:w])
+		copy(tbs[w-3:], "...")
+		text = string(tbs)
 	}
-	if i == len(b.boards) {
-		return s.Render("New board")
-	}
-
-	return s.Render(b.boards[i].Name)
-}
-
-func Boxed(boards []Board) boardRenderer {
-	d := lipgloss.NewStyle().
-		Align(lipgloss.Center, lipgloss.Center).
-		Border(lipgloss.RoundedBorder()).
-		Padding(1, 2).
-		MarginTop(1).
-		Width(40)
-
-	s := d.BorderForeground(ColorLightBlue)
-	return boardRenderer{boards, d, s}
+	return text
 }
