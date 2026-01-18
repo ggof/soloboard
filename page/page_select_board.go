@@ -150,25 +150,15 @@ func (p PageSelectBoard) View() string {
 
 		var text string
 
-		if p.insertMode && p.I == i {
+		switch {
+		case p.insertMode && p.I == i:
 			ss = ss.Align(lipgloss.Left)
 			text = ellipsisBeg(p.title, w-3) + "|"
-		} else if i == len(p.boards) {
+		case i == len(p.boards):
 			text = ellipsisEnd("New Board", w-2)
-		} else {
+		default:
 			text = ellipsisEnd(p.boards[i].Name, w-2)
 		}
-
-		// if i == len(p.boards) {
-		// 	if p.insertMode {
-		// 		ss = ss.Align(lipgloss.Left)
-		// 		text = ellipsisBeg(p.title, w-3) + "|"
-		// 	} else {
-		// 		text = "New board"
-		// 	}
-		// } else {
-		// 	text = ellipsisEnd(p.boards[i].Name, w-2)
-		// }
 
 		elems = append(elems, ss.Render(text))
 	}
