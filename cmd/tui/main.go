@@ -6,6 +6,7 @@ import (
 	"path"
 	"soloboard/db"
 	"soloboard/page"
+	"soloboard/sighandler"
 	"soloboard/stacknav"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -38,7 +39,7 @@ func main() {
 
 	log.SetOutput(os.Stderr)
 
-	p := tea.NewProgram(stacknav.New(page.SelectBoard(db.NewBoardDatabase(dbfilename))), tea.WithoutCatchPanics())
+	p := tea.NewProgram(sighandler.New(stacknav.New(page.SelectBoard(db.NewBoardDatabase(dbfilename)))), tea.WithoutCatchPanics())
 	_, err := p.Run()
 	if err != nil {
 		panic(err)

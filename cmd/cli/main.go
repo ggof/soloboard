@@ -49,9 +49,9 @@ func (t TryViewportApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return t, tea.Quit
 		case "j":
-			t.Down()
+			t.Prev()
 		case "k":
-			t.Up()
+			t.Next()
 		case "n":
 			n := rand.Int64N(16)
 			t.items = append(t.items, strconv.FormatInt(n, 16))

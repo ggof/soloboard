@@ -18,7 +18,7 @@ func New(itemSize int) Viewport {
 	return Viewport{itemSize: itemSize}
 }
 
-func (v *Viewport) Up() {
+func (v *Viewport) Prev() {
 	if v.I > 0 {
 		v.I--
 
@@ -31,7 +31,7 @@ func (v *Viewport) Up() {
 	}
 }
 
-func (v *Viewport) Down() {
+func (v *Viewport) Next() {
 	if v.I < v.len-1 {
 		v.I++
 
@@ -44,8 +44,8 @@ func (v *Viewport) Down() {
 	}
 }
 
-func (v *Viewport) SetSize(h int) {
-	v.size = h
+func (v *Viewport) SetSize(size int) {
+	v.size = size
 	v.updateViewportSize()
 }
 

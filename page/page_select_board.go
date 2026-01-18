@@ -4,6 +4,7 @@ import (
 	"slices"
 	"soloboard/color"
 	"soloboard/model"
+	"soloboard/stacknav"
 	"soloboard/viewport"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -49,8 +50,6 @@ func (p PageSelectBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.KeyMsg:
 		key := msg.String()
 		switch key {
-		case "ctrl+c":
-			return p, tea.Quit
 		default:
 			if !p.insertMode {
 				return p.handleNormalMode(key)
@@ -98,9 +97,9 @@ func (p PageSelectBoard) handleNormalMode(key string) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch key {
 	case "j":
-		p.Down()
+		p.Next()
 	case "k":
-		p.Up()
+		p.Prev()
 	case "r":
 		if p.I == len(p.boards) {
 			// `new board` needs `enter` to edit
@@ -118,8 +117,7 @@ func (p PageSelectBoard) handleNormalMode(key string) (tea.Model, tea.Cmd) {
 		if p.I == len(p.boards) {
 			p.insertMode = true
 		} else {
-
-			// TODO: return the next page
+			cmd = stacknav.Push(ViewBoard(p.boards[p.I], p.w, p.h))
 		}
 	}
 
