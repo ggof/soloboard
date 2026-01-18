@@ -1,16 +1,27 @@
-package main
+package page
 
 import (
 	"slices"
-	"soloboard/components"
+	"soloboard/color"
+	"soloboard/model"
+	"soloboard/viewport"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
+type BoardDatabase interface {
+	Read() ([]model.Board, error)
+	Write([]model.Board) error
+}
+
+func SelectBoard(db BoardDatabase) PageSelectBoard {
+	return PageSelectBoard{db: db, Viewport: viewport.New(5)}
+}
+
 type PageSelectBoard struct {
-	boards []Board
-	vp     *components.Viewport
+	boards []model.Board
+	viewport.Viewport
 
 	title      string
 	insertMode bool
@@ -32,9 +43,9 @@ func (p PageSelectBoard) Init() tea.Cmd {
 
 func (p PageSelectBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
-	case []Board:
+	case []model.Board:
 		p.boards = msg
-		p.vp.SetLen(len(p.boards) + 1)
+		p.SetLen(len(p.boards) + 1)
 	case tea.KeyMsg:
 		key := msg.String()
 		switch key {
@@ -50,7 +61,7 @@ func (p PageSelectBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		p.w = msg.Width
 		p.h = msg.Height
-		p.vp.SetSize(2 * p.h / 3)
+		p.SetSize(2 * p.h / 3)
 	}
 	return p, nil
 }
@@ -65,10 +76,14 @@ func (p PageSelectBoard) handleInsertMode(key string) (tea.Model, tea.Cmd) {
 		p.title += key
 
 	case key == "enter":
-		p.boards = append(p.boards, Board{Name: p.title, Sections: []Section{{Name: "TODO"}, {Name: "IN PROGRESS"}, {Name: "DONE"}}})
+		if p.I == len(p.boards) {
+			p.boards = append(p.boards, model.Board{Name: p.title, Sections: []model.Section{{Name: "TODO"}, {Name: "IN PROGRESS"}, {Name: "DONE"}}})
+			p.SetLen(len(p.boards) + 1)
+		} else {
+			p.boards[p.I].Name = p.title
+		}
 		p.title = ""
 		p.insertMode = false
-		p.vp.SetLen(len(p.boards) + 1)
 		cmd = p.saveBoards()
 	case key == "backspace":
 		if p.title != "" {
@@ -83,19 +98,27 @@ func (p PageSelectBoard) handleNormalMode(key string) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch key {
 	case "j":
-		p.vp.Down()
+		p.Down()
 	case "k":
-		p.vp.Up()
+		p.Up()
+	case "r":
+		if p.I == len(p.boards) {
+			// `new board` needs `enter` to edit
+			break
+		}
+		p.insertMode = true
+		p.title = p.boards[p.I].Name
 	case "d", "x":
-		if p.vp.I < len(p.boards) {
-			p.boards = slices.Delete(p.boards, p.vp.I, p.vp.I+1)
-			p.vp.SetLen(len(p.boards) + 1)
+		if p.I < len(p.boards) {
+			p.boards = slices.Delete(p.boards, p.I, p.I+1)
+			p.SetLen(len(p.boards) + 1)
 			cmd = p.saveBoards()
 		}
 	case "enter":
-		if p.vp.I == len(p.boards) {
+		if p.I == len(p.boards) {
 			p.insertMode = true
 		} else {
+
 			// TODO: return the next page
 		}
 	}
@@ -112,31 +135,40 @@ func (p PageSelectBoard) View() string {
 		MarginBottom(1).
 		Width(w)
 
-	s := d.BorderForeground(ColorLightBlue)
+	s := d.BorderForeground(color.LightBlue)
 
 	var elems []string
 
-	for i := range p.vp.Window() {
+	for i := range p.Window() {
 		ss := d
-		if p.vp.I == i {
+		if p.I == i {
 			ss = s
-			if i == len(p.boards) {
-				ss = ss.BorderForeground(ColorPurple)
+			if p.insertMode {
+				ss = ss.BorderForeground(color.Purple)
 			}
 		}
 
 		var text string
 
-		if i == len(p.boards) {
-			if p.insertMode {
-				ss = ss.Align(lipgloss.Left)
-				text = ellipsisBeg(p.title, w-3) + "|"
-			} else {
-				text = "New board"
-			}
+		if p.insertMode && p.I == i {
+			ss = ss.Align(lipgloss.Left)
+			text = ellipsisBeg(p.title, w-3) + "|"
+		} else if i == len(p.boards) {
+			text = ellipsisEnd("New Board", w-2)
 		} else {
 			text = ellipsisEnd(p.boards[i].Name, w-2)
 		}
+
+		// if i == len(p.boards) {
+		// 	if p.insertMode {
+		// 		ss = ss.Align(lipgloss.Left)
+		// 		text = ellipsisBeg(p.title, w-3) + "|"
+		// 	} else {
+		// 		text = "New board"
+		// 	}
+		// } else {
+		// 	text = ellipsisEnd(p.boards[i].Name, w-2)
+		// }
 
 		elems = append(elems, ss.Render(text))
 	}

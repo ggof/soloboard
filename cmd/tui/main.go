@@ -1,36 +1,16 @@
 package main
 
 import (
+	"log"
 	"os"
 	"path"
-	"soloboard/components"
+	"soloboard/db"
+	"soloboard/page"
+	"soloboard/stacknav"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/muesli/termenv"
 )
-
-type BoardDatabase interface {
-	Read() ([]Board, error)
-	Write([]Board) error
-}
-
-type Task struct {
-	ID          int
-	Name        string
-	Description string
-}
-
-type Section struct {
-	ID    int
-	Name  string
-	Tasks []Task
-}
-
-type Board struct {
-	ID       int
-	Name     string
-	Sections []Section
-}
 
 func main() {
 	dbpath := os.ExpandEnv("$HOME/.local/share/soloboard")
@@ -56,7 +36,9 @@ func main() {
 	o.SetCursorColor(termenv.ANSIWhite)
 	o.SetForegroundColor(termenv.ANSIWhite)
 
-	p := tea.NewProgram(PageSelectBoard{db: NewBoardDatabase(dbfilename), vp: components.NewViewport(0, 5)}, tea.WithoutCatchPanics())
+	log.SetOutput(os.Stderr)
+
+	p := tea.NewProgram(stacknav.New(page.SelectBoard(db.NewBoardDatabase(dbfilename))), tea.WithoutCatchPanics())
 	_, err := p.Run()
 	if err != nil {
 		panic(err)

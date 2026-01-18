@@ -4,7 +4,8 @@ import (
 	"context"
 	"math/rand/v2"
 	"os"
-	"soloboard/components"
+	"soloboard/color"
+	"soloboard/viewport"
 	"strconv"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -26,8 +27,9 @@ func main() {
 }
 
 type TryViewportApp struct {
-	items []Item
-	vp    *components.Viewport
+	items []string
+	viewport.Viewport
+	w, h int
 }
 
 // Init implements [tea.Model].
@@ -38,23 +40,23 @@ func (t TryViewportApp) Init() tea.Cmd {
 // Update implements [tea.Model].
 func (t TryViewportApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		t.w = msg.Width
+		t.h = msg.Height
+		t.SetSize(t.h)
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return t, tea.Quit
 		case "j":
-			t.vp.Down()
+			t.Down()
 		case "k":
-			t.vp.Up()
+			t.Up()
 		case "n":
 			n := rand.Int64N(16)
-			t.items = append(t.items, Item{strconv.FormatInt(n, 16)})
-			t.vp.SetList(RenderAsBox(t.items))
-
+			t.items = append(t.items, strconv.FormatInt(n, 16))
+			t.SetLen(len(t.items))
 		}
-
-	case tea.WindowSizeMsg:
-		t.vp.SetSize(msg.Width, msg.Height)
 	}
 
 	return t, nil
@@ -62,49 +64,33 @@ func (t TryViewportApp) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 // View implements [tea.Model].
 func (t TryViewportApp) View() string {
-	return t.vp.Render()
-}
+	container := lipgloss.NewStyle().Padding(1).Margin(1).Border(lipgloss.RoundedBorder()).BorderForeground(color.Lime).Align(lipgloss.Center)
+	box := container.UnsetMargins().MarginBottom(1)
+	selected := box.BorderForeground(color.Orange)
 
-var tva tea.Model = (*TryViewportApp)(nil)
+	var items []string
 
-type Item struct {
-	Title string
+	for i := range t.Window() {
+		style := box
+		if i == t.I {
+			style = selected
+		}
+
+		items = append(items, style.Render(t.items[i]))
+	}
+
+	return lipgloss.Place(t.w, t.h, lipgloss.Center, lipgloss.Center, container.Render(lipgloss.JoinVertical(lipgloss.Center, items...)))
 }
 
 func TryViewport(ctx context.Context, c *cli.Command) error {
-	items := make([]Item, 16)
+	items := make([]string, 16)
 	for i := range items {
-		items[i].Title = strconv.FormatInt(int64(i), 16)
+		items[i] = strconv.FormatInt(int64(i), 16)
 	}
 
-	vp := components.NewViewport(RenderAsBox(items), len(items))
+	vp := viewport.New(5)
 
-	tea.NewProgram(TryViewportApp{items, vp}).Run()
+	tea.NewProgram(TryViewportApp{Viewport: vp, items: items}).Run()
 
 	return nil
-}
-
-type itemSliceRenderer struct {
-	items         []Item
-	defaultStyle  lipgloss.Style
-	selectedStyle lipgloss.Style
-}
-
-func (isr itemSliceRenderer) RenderItem(i int, selected bool) string {
-	s := isr.defaultStyle
-	if selected {
-		s = isr.selectedStyle
-	}
-	return s.Render(isr.items[i].Title)
-}
-
-func (isr itemSliceRenderer) Len() int { return len(isr.items) }
-
-func RenderAsBox(items []Item) itemSliceRenderer {
-	defaultStyle := lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).MarginBottom(1).Padding(1, 0).Width(40).Align(lipgloss.Center)
-	selectedStyle := defaultStyle.BorderForeground(lipgloss.Color("#ff0000"))
-
-	return itemSliceRenderer{
-		items, defaultStyle, selectedStyle,
-	}
 }

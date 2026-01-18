@@ -1,21 +1,21 @@
-package components
+package viewport
 
 import (
 	"iter"
 )
 
 type Viewport struct {
-	I   int
-	beg int
-	end int
-	max int
-	h   int
-	iht int
-	len int
+	I        int
+	beg      int
+	end      int
+	max      int
+	size     int
+	itemSize int
+	len      int
 }
 
-func NewViewport(length int, itemHeight int) *Viewport {
-	return &Viewport{len: length, iht: itemHeight}
+func New(itemSize int) Viewport {
+	return Viewport{itemSize: itemSize}
 }
 
 func (v *Viewport) Up() {
@@ -45,7 +45,7 @@ func (v *Viewport) Down() {
 }
 
 func (v *Viewport) SetSize(h int) {
-	v.h = h
+	v.size = h
 	v.updateViewportSize()
 }
 
@@ -59,7 +59,7 @@ func (v *Viewport) updateViewportSize() {
 		return
 	}
 
-	v.max = max(1, v.h/(v.iht+1)) // count some margin, show at least 1 item
+	v.max = max(1, v.size/(v.itemSize))
 
 	v.beg = v.I
 	v.end = v.I
