@@ -5,18 +5,19 @@ import (
 	"soloboard/color"
 	"soloboard/model"
 	"soloboard/stacknav"
+	"soloboard/utils"
 	"soloboard/viewport"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 )
 
-type BoardDatabase interface {
+type Database interface {
 	Read() ([]model.Board, error)
 	Write([]model.Board) error
 }
 
-func SelectBoard(db BoardDatabase) PageSelectBoard {
+func SelectBoard(db Database) PageSelectBoard {
 	return PageSelectBoard{db: db, Viewport: viewport.New(5)}
 }
 
@@ -26,7 +27,7 @@ type PageSelectBoard struct {
 
 	title      string
 	insertMode bool
-	db         BoardDatabase
+	db         Database
 
 	w int
 	h int
@@ -76,7 +77,7 @@ func (p PageSelectBoard) handleInsertMode(key string) (tea.Model, tea.Cmd) {
 
 	case key == "enter":
 		if p.I == len(p.boards) {
-			p.boards = append(p.boards, model.Board{Name: p.title, Sections: []model.Section{{Name: "TODO"}, {Name: "IN PROGRESS"}, {Name: "DONE"}}})
+			p.boards = append(p.boards, model.NewBoard(p.title))
 			p.SetLen(len(p.boards) + 1)
 		} else {
 			p.boards[p.I].Name = p.title
@@ -151,11 +152,11 @@ func (p PageSelectBoard) View() string {
 		switch {
 		case p.insertMode && p.I == i:
 			ss = ss.Align(lipgloss.Left)
-			text = ellipsisBeg(p.title, w-3) + "|"
+			text = utils.EllipsisBeg(p.title, w-3) + "|"
 		case i == len(p.boards):
-			text = ellipsisEnd("New Board", w-2)
+			text = utils.EllipsisEnd("New Board", w-2)
 		default:
-			text = ellipsisEnd(p.boards[i].Name, w-2)
+			text = utils.EllipsisEnd(p.boards[i].Name, w-2)
 		}
 
 		elems = append(elems, ss.Render(text))
@@ -172,22 +173,4 @@ func (p PageSelectBoard) saveBoards() tea.Cmd {
 
 		return nil
 	}
-}
-
-func ellipsisBeg(text string, w int) string {
-	if len(text) > w {
-		tbs := []byte(text[len(text)-w:])
-		copy(tbs[0:3], "...")
-		text = string(tbs)
-	}
-	return text
-}
-
-func ellipsisEnd(text string, w int) string {
-	if len(text) > w {
-		tbs := []byte(text[:w])
-		copy(tbs[w-3:], "...")
-		text = string(tbs)
-	}
-	return text
 }

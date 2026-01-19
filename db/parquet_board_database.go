@@ -1,6 +1,8 @@
 package db
 
 import (
+	"errors"
+	"os"
 	"soloboard/model"
 
 	"github.com/parquet-go/parquet-go"
@@ -11,6 +13,9 @@ type parquetBoardDatabase struct {
 }
 
 func NewBoardDatabase(dbfilename string) parquetBoardDatabase {
+	if _, err := os.Stat(dbfilename); errors.Is(err, os.ErrNotExist) {
+		parquet.WriteFile(dbfilename, []model.Board{})
+	}
 	return parquetBoardDatabase{dbfilename}
 }
 
