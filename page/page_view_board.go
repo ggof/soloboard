@@ -70,7 +70,6 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 func (p PageViewBoard) View() string {
-	title := lipgloss.Place(p.w, 3, lipgloss.Center, lipgloss.Center, p.boards[p.i].Name)
 	d := lipgloss.NewStyle().Width(sectionWidth).Height(p.h - 3 - 2).AlignVertical(lipgloss.Top).Border(lipgloss.RoundedBorder())
 
 	s := d.BorderForeground(color.Lime)
@@ -82,6 +81,11 @@ func (p PageViewBoard) View() string {
 	for i := range p.Window() {
 		vp := p.columns[i]
 		var col []string
+
+		colTitleStyle := lipgloss.NewStyle().Padding(1).Underline(true)
+		colTitle := lipgloss.PlaceHorizontal(sectionWidth-2, lipgloss.Center, colTitleStyle.Render(p.boards[p.i].Sections[i].Name))
+
+		col = append(col, colTitle)
 		for j := range vp.Window() {
 			ss := taskBox
 			if p.I == i && vp.I == j {
@@ -93,20 +97,16 @@ func (p PageViewBoard) View() string {
 
 			col = append(col, task)
 		}
-		colTitleStyle := lipgloss.NewStyle().Padding(1).Underline(true)
-		colTitle := lipgloss.PlaceHorizontal(sectionWidth-2, lipgloss.Center, colTitleStyle.Render(p.boards[p.i].Sections[i].Name))
 		ss := d
 		if p.I == i {
 			ss = s
 		}
 
-		cols = append(cols,
-			ss.Render(lipgloss.JoinVertical(lipgloss.Center,
-				append([]string{colTitle}, col...)...)))
+		cols = append(cols, ss.Render(lipgloss.JoinVertical(lipgloss.Center, col...)))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Center,
-		lipgloss.PlaceHorizontal(p.w, lipgloss.Center, title),
+		lipgloss.Place(p.w, 3, lipgloss.Center, lipgloss.Center, lipgloss.NewStyle().Bold(true).Underline(true).Render(p.boards[p.i].Name)),
 		lipgloss.PlaceHorizontal(p.w, lipgloss.Center, lipgloss.JoinHorizontal(lipgloss.Center, cols...)),
 	)
 }
