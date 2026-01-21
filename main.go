@@ -6,7 +6,9 @@ import (
 	"log"
 	"os"
 	"path"
+	"slices"
 	"soloboard/db"
+	"soloboard/model"
 	"soloboard/page"
 	"soloboard/sighandler"
 	"soloboard/stacknav"
@@ -15,6 +17,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
+	"github.com/oklog/ulid/v2"
 
 	// "github.com/charmbracelet/x/term"
 	"github.com/muesli/termenv"
@@ -82,7 +85,7 @@ func ListBoards(e *Env) cli.ActionFunc {
 			return err
 		}
 
-		size := w/2
+		size := w / 2
 
 		parts := make([]string, len(boards)+1)
 		parts[0] = lipgloss.JoinHorizontal(lipgloss.Center,
@@ -103,6 +106,71 @@ func ListBoards(e *Env) cli.ActionFunc {
 	}
 }
 
+func SeedDatabase(env *Env) cli.ActionFunc {
+	return func(ctx context.Context, c *cli.Command) error {
+		boards, err := env.DB.Read()
+		if err != nil {
+			return err
+		}
+
+		seed := model.Board{
+			ID:   ulid.Make().String(),
+			Name: "seed",
+			Sections: []model.Section{
+				{
+					ID:   ulid.Make().String(),
+					Name: "TODO",
+					Tasks: []model.Task{
+						model.NewTask("t00", "lorem"),
+						model.NewTask("t01", "lorem"),
+						model.NewTask("t02", "lorem"),
+						model.NewTask("t03", "lorem"),
+						model.NewTask("t04", "lorem"),
+						model.NewTask("t05", "lorem"),
+						model.NewTask("t06", "lorem"),
+						model.NewTask("t07", "lorem"),
+						model.NewTask("t08", "lorem"),
+						model.NewTask("t09", "lorem"),
+					},
+				},
+				{
+					ID:   ulid.Make().String(),
+					Name: "IN PROGRESS",
+					Tasks: []model.Task{
+						model.NewTask("t10", "lorem"),
+					},
+				},
+				{
+					ID:   ulid.Make().String(),
+					Name: "DONE",
+					Tasks: []model.Task{
+						model.NewTask("t20", "lorem"),
+						model.NewTask("t21", "lorem"),
+						model.NewTask("t22", "lorem"),
+						model.NewTask("t23", "lorem"),
+						model.NewTask("t24", "lorem"),
+						model.NewTask("t25", "lorem"),
+						model.NewTask("t26", "lorem"),
+						model.NewTask("t27", "lorem"),
+						model.NewTask("t28", "lorem"),
+						model.NewTask("t29", "lorem"),
+					},
+				},
+			},
+		}
+
+		for i, b := range boards {
+			if b.Name == seed.Name {
+				boards = slices.Delete(boards, i, i+1)
+			}
+		}
+
+		boards = append(boards, seed)
+
+		return env.DB.Write(boards)
+	}
+}
+
 func main() {
 	env := NewEnv()
 
@@ -113,6 +181,11 @@ func main() {
 				Name:        "list",
 				Description: "List the current boards",
 				Action:      ListBoards(env),
+			},
+			{
+				Name:        "seed",
+				Description: "Create a test database (for debug purposes)",
+				Action:      SeedDatabase(env),
 			},
 		},
 	}

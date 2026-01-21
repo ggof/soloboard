@@ -13,21 +13,30 @@ const sectionWidth = 40
 
 type PageViewBoard struct {
 	viewport.Viewport
-	board model.Board
+	boards  []model.Board
+	columns []viewport.Viewport
 
-	w, h int
+	i, w, h int
 }
 
-func ViewBoard(board model.Board, width, height int) PageViewBoard {
+func ViewBoard(boards []model.Board, i, width, height int) PageViewBoard {
 	p := PageViewBoard{
 		Viewport: viewport.New(sectionWidth),
-		board:    board,
+		boards:   boards,
+		i:        i,
 		w:        width,
 		h:        height,
 	}
 
 	p.SetSize(p.w)
-	p.SetLen(len(p.board.Sections))
+	p.SetLen(len(p.boards[i].Sections))
+
+	p.columns = make([]viewport.Viewport, len(p.boards[i].Sections))
+	for j := range boards[i].Sections {
+		p.columns[j] = viewport.New(2 + 3)    // allow 3 lines of text per task
+		p.columns[j].SetSize(p.h - 3 - 3 - 2) // 3 lines for title, 3 lines for col title, 2 lines for borders
+		p.columns[j].SetLen(len(boards[i].Sections[j].Tasks))
+	}
 
 	return p
 }
@@ -42,30 +51,58 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		p.w, p.h = msg.Width, msg.Height
 		p.SetSize(p.w)
+		for j := range p.columns {
+			p.columns[j].SetSize(p.h - 3 - 3 - 2)
+		}
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "h":
 			p.Prev()
 		case "l":
 			p.Next()
+		case "j":
+			p.columns[p.I].Next()
+		case "k":
+			p.columns[p.I].Prev()
 		}
 	}
 	return p, cmd
 }
 
 func (p PageViewBoard) View() string {
-	title := lipgloss.PlaceVertical(3, lipgloss.Center, p.board.Name)
-	d := lipgloss.NewStyle().Width(sectionWidth).Height(p.h-5).Padding(0, 1).Align(lipgloss.Center, lipgloss.Top).Border(lipgloss.RoundedBorder())
+	title := lipgloss.Place(p.w, 3, lipgloss.Center, lipgloss.Center, p.boards[p.i].Name)
+	d := lipgloss.NewStyle().Width(sectionWidth).Height(p.h - 3 - 2).AlignVertical(lipgloss.Top).Border(lipgloss.RoundedBorder())
 
 	s := d.BorderForeground(color.Lime)
 
+	taskBox := lipgloss.NewStyle().Align(lipgloss.Center).Border(lipgloss.RoundedBorder())
+	selectedTask := taskBox.BorderForeground(color.LightBlue)
+
 	var cols []string
 	for i := range p.Window() {
-		if p.I == i {
-			cols = append(cols, s.Render(p.board.Sections[i].Name))
-		} else {
-			cols = append(cols, d.Render(p.board.Sections[i].Name))
+		vp := p.columns[i]
+		var col []string
+		for j := range vp.Window() {
+			ss := taskBox
+			if p.I == i && vp.I == j {
+				ss = selectedTask
+			}
+
+			task := lipgloss.Place(sectionWidth-2, 3, lipgloss.Left, lipgloss.Center, p.boards[p.i].Sections[i].Tasks[j].Name)
+			task = ss.Render(task)
+
+			col = append(col, task)
 		}
+		colTitleStyle := lipgloss.NewStyle().Padding(1).Underline(true)
+		colTitle := lipgloss.PlaceHorizontal(sectionWidth-2, lipgloss.Center, colTitleStyle.Render(p.boards[p.i].Sections[i].Name))
+		ss := d
+		if p.I == i {
+			ss = s
+		}
+
+		cols = append(cols,
+			ss.Render(lipgloss.JoinVertical(lipgloss.Center,
+				append([]string{colTitle}, col...)...)))
 	}
 
 	return lipgloss.JoinVertical(lipgloss.Center,

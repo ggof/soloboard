@@ -118,7 +118,7 @@ func (p PageSelectBoard) handleNormalMode(key string) (tea.Model, tea.Cmd) {
 		if p.I == len(p.boards) {
 			p.insertMode = true
 		} else {
-			cmd = stacknav.Push(ViewBoard(p.boards[p.I], p.w, p.h))
+			cmd = stacknav.Push(ViewBoard(p.boards, p.I, p.w, p.h))
 		}
 	}
 
