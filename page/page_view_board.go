@@ -1,6 +1,7 @@
 package page
 
 import (
+	"slices"
 	"soloboard/color"
 	"soloboard/model"
 	"soloboard/viewport"
@@ -15,14 +16,18 @@ type PageViewBoard struct {
 	viewport.Viewport
 	boards  []model.Board
 	columns []viewport.Viewport
+	db      Database
 
 	i, w, h int
 }
 
-func ViewBoard(boards []model.Board, i, width, height int) PageViewBoard {
+func ViewBoard(db Database, boards []model.Board, i, width, height int) PageViewBoard {
+	sw := max(40, width/3)
+
 	p := PageViewBoard{
-		Viewport: viewport.New(sectionWidth),
+		Viewport: viewport.New(sw),
 		boards:   boards,
+		db:       db,
 		i:        i,
 		w:        width,
 		h:        height,
@@ -64,6 +69,41 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.columns[p.I].Next()
 		case "k":
 			p.columns[p.I].Prev()
+		case "H":
+			oldcol := p.I
+			p.moveTask(p.I, p.I-1, p.columns[p.I].I)
+			p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
+			if p.columns[p.I].I == len(p.boards[p.i].Sections[p.I].Tasks) {
+				p.columns[p.I].I--
+			}
+			p.Prev()
+			if oldcol != p.I {
+				p.columns[p.I].I = len(p.boards[p.i].Sections[p.I].Tasks) - 1
+				p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
+			}
+			cmd = p.saveBoards()
+		case "L":
+			oldcol := p.I
+			p.moveTask(p.I, p.I+1, p.columns[p.I].I)
+			if p.columns[p.I].I == len(p.boards[p.i].Sections[p.I].Tasks) {
+				p.columns[p.I].I--
+			}
+			p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
+			p.Next()
+			if oldcol != p.I {
+				p.columns[p.I].I = len(p.boards[p.i].Sections[p.I].Tasks) - 1
+				p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
+			}
+
+			cmd = p.saveBoards()
+		case "K":
+			p.swapTask(p.I, p.columns[p.I].I, p.columns[p.I].I-1)
+			p.columns[p.I].Prev()
+			cmd = p.saveBoards()
+		case "J":
+			p.swapTask(p.I, p.columns[p.I].I, p.columns[p.I].I+1)
+			p.columns[p.I].Next()
+			cmd = p.saveBoards()
 		}
 	}
 	return p, cmd
@@ -109,4 +149,33 @@ func (p PageViewBoard) View() string {
 		lipgloss.Place(p.w, 3, lipgloss.Center, lipgloss.Center, lipgloss.NewStyle().Bold(true).Underline(true).Render(p.boards[p.i].Name)),
 		lipgloss.PlaceHorizontal(p.w, lipgloss.Center, lipgloss.JoinHorizontal(lipgloss.Center, cols...)),
 	)
+}
+
+func (p *PageViewBoard) swapTask(s, i, j int) {
+	if j < 0 || j == len(p.boards[p.i].Sections[s].Tasks) {
+		return
+	}
+
+	p.boards[p.i].Sections[s].Tasks[i], p.boards[p.i].Sections[s].Tasks[j] = p.boards[p.i].Sections[s].Tasks[j], p.boards[p.i].Sections[s].Tasks[i]
+}
+
+func (p *PageViewBoard) moveTask(si, sj, i int) {
+	if sj < 0 || sj == len(p.boards[p.i].Sections) {
+		return
+	}
+
+	task := p.boards[p.i].Sections[si].Tasks[i]
+
+	p.boards[p.i].Sections[si].Tasks = slices.Delete(p.boards[p.i].Sections[si].Tasks, i, i+1)
+	p.boards[p.i].Sections[sj].Tasks = append(p.boards[p.i].Sections[sj].Tasks, task)
+}
+
+func (p PageViewBoard) saveBoards() tea.Cmd {
+	return func() tea.Msg {
+		if err := p.db.Write(p.boards); err != nil {
+			panic(err)
+		}
+
+		return nil
+	}
 }

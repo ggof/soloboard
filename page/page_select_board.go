@@ -5,6 +5,7 @@ import (
 	"soloboard/color"
 	"soloboard/model"
 	"soloboard/stacknav"
+	"soloboard/style"
 	"soloboard/utils"
 	"soloboard/viewport"
 
@@ -118,7 +119,7 @@ func (p PageSelectBoard) handleNormalMode(key string) (tea.Model, tea.Cmd) {
 		if p.I == len(p.boards) {
 			p.insertMode = true
 		} else {
-			cmd = stacknav.Push(ViewBoard(p.boards, p.I, p.w, p.h))
+			cmd = stacknav.Push(ViewBoard(p.db, p.boards, p.I, p.w, p.h))
 		}
 	}
 
@@ -127,14 +128,8 @@ func (p PageSelectBoard) handleNormalMode(key string) (tea.Model, tea.Cmd) {
 
 func (p PageSelectBoard) View() string {
 	w := max(40, p.w/3)
-	d := lipgloss.NewStyle().
-		Align(lipgloss.Center, lipgloss.Center).
-		Border(lipgloss.RoundedBorder()).
-		Padding(1).
-		MarginBottom(1).
-		Width(w)
-
-	s := d.BorderForeground(color.LightBlue)
+	d := style.Box.Width(w)
+	s := style.SelectedBox.Width(w)
 
 	var elems []string
 

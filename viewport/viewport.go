@@ -56,6 +56,9 @@ func (v *Viewport) SetLen(length int) {
 
 func (v *Viewport) updateViewportSize() {
 	if v.len == 0 {
+		v.beg = 0
+		v.end = 0
+		v.I = 0
 		return
 	}
 
