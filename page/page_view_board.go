@@ -4,6 +4,8 @@ import (
 	"slices"
 	"soloboard/color"
 	"soloboard/model"
+	"soloboard/overlay"
+	"soloboard/utils"
 	"soloboard/viewport"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -19,6 +21,9 @@ type PageViewBoard struct {
 	db      Database
 
 	i, w, h int
+
+	columnOverlay bool
+	newColumnName string
 }
 
 func ViewBoard(db Database, boards []model.Board, i, width, height int) PageViewBoard {
@@ -60,7 +65,14 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.columns[j].SetSize(p.h - 3 - 3 - 2)
 		}
 	case tea.KeyMsg:
+		if p.columnOverlay {
+			return p.handleColumnOverlay(msg)
+
+		}
 		switch msg.String() {
+		// N means new column
+		case "N":
+			p.columnOverlay = true
 		case "h":
 			p.Prev()
 		case "l":
@@ -104,8 +116,39 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.swapTask(p.I, p.columns[p.I].I, p.columns[p.I].I+1)
 			p.columns[p.I].Next()
 			cmd = p.saveBoards()
+		case "X":
+			p.boards[p.i].Sections = slices.Delete(p.boards[p.i].Sections, p.I, p.I+1)
+			p.SetLen(len(p.boards[p.i].Sections))
+			if p.I == len(p.boards[p.i].Sections) {
+				p.Prev()
+			}
 		}
 	}
+	return p, cmd
+}
+
+func (p PageViewBoard) handleColumnOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	key := msg.String()
+	switch {
+	case key == "enter":
+		p.boards[p.i].Sections = append(p.boards[p.i].Sections, model.NewSection(p.newColumnName))
+		p.columnOverlay = false
+		p.newColumnName = ""
+		p.I = len(p.currentBoard().Sections) - 1
+		p.SetLen(len(p.currentBoard().Sections))
+		cmd = p.saveBoards()
+	case key == "backspace":
+		if p.newColumnName != "" {
+			p.newColumnName = p.newColumnName[:len(p.newColumnName)-1]
+		}
+	case len(key) == 1:
+		p.newColumnName += key
+	case key == "esc":
+		p.newColumnName = ""
+		p.columnOverlay = false
+	}
+
 	return p, cmd
 }
 
@@ -123,7 +166,7 @@ func (p PageViewBoard) View() string {
 		var col []string
 
 		colTitleStyle := lipgloss.NewStyle().Padding(1).Underline(true)
-		colTitle := lipgloss.PlaceHorizontal(sectionWidth-2, lipgloss.Center, colTitleStyle.Render(p.boards[p.i].Sections[i].Name))
+		colTitle := lipgloss.PlaceHorizontal(sectionWidth-2, lipgloss.Center, colTitleStyle.Render(p.sectionAt(i).Name))
 
 		col = append(col, colTitle)
 		for j := range vp.Window() {
@@ -132,7 +175,7 @@ func (p PageViewBoard) View() string {
 				ss = selectedTask
 			}
 
-			task := lipgloss.Place(sectionWidth-2, 3, lipgloss.Left, lipgloss.Center, p.boards[p.i].Sections[i].Tasks[j].Name)
+			task := lipgloss.Place(sectionWidth-2, 3, lipgloss.Left, lipgloss.Center, p.taskAt(i, j).Name)
 			task = ss.Render(task)
 
 			col = append(col, task)
@@ -145,10 +188,30 @@ func (p PageViewBoard) View() string {
 		cols = append(cols, ss.Render(lipgloss.JoinVertical(lipgloss.Center, col...)))
 	}
 
-	return lipgloss.JoinVertical(lipgloss.Center,
+	bg := lipgloss.JoinVertical(lipgloss.Center,
 		lipgloss.Place(p.w, 3, lipgloss.Center, lipgloss.Center, lipgloss.NewStyle().Bold(true).Underline(true).Render(p.boards[p.i].Name)),
 		lipgloss.PlaceHorizontal(p.w, lipgloss.Center, lipgloss.JoinHorizontal(lipgloss.Center, cols...)),
 	)
+
+	if p.columnOverlay {
+		bg = overlay.PlaceOverlayCenter(bg, p.newColumnOverlay())
+	}
+
+	return bg
+}
+
+func (p PageViewBoard) newColumnOverlay() string {
+	w, h := max(38, p.w/2), 4
+	bordered := lipgloss.NewStyle().Border(lipgloss.RoundedBorder())
+
+	input := bordered.Width(w)
+
+	return bordered.Render(
+		lipgloss.Place(w, h, lipgloss.Left, lipgloss.Top,
+			lipgloss.JoinVertical(lipgloss.Center,
+				"New column name:",
+				input.Render(utils.EllipsisBeg(p.newColumnName+"|", w)))))
+
 }
 
 func (p *PageViewBoard) swapTask(s, i, j int) {
@@ -178,4 +241,24 @@ func (p PageViewBoard) saveBoards() tea.Cmd {
 
 		return nil
 	}
+}
+
+func (p PageViewBoard) currentBoard() model.Board {
+	return p.boards[p.i]
+}
+
+func (p PageViewBoard) currentSection() model.Section {
+	return p.sectionAt(p.I)
+}
+
+func (p PageViewBoard) currentTask() model.Task {
+	return p.taskAt(p.I, p.columns[p.I].I)
+}
+
+func (p PageViewBoard) sectionAt(s int) model.Section {
+	return p.boards[p.i].Sections[s]
+}
+
+func (p PageViewBoard) taskAt(s, t int) model.Task {
+	return p.boards[p.i].Sections[s].Tasks[t]
 }

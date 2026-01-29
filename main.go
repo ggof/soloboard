@@ -58,7 +58,7 @@ func StartTUI(e *Env) cli.ActionFunc {
 		o.SetCursorColor(termenv.ANSIWhite)
 		o.SetForegroundColor(termenv.ANSIWhite)
 
-		log.SetOutput(os.Stderr)
+		// log.SetOutput(os.Stderr)
 
 		p := tea.NewProgram(
 			sighandler.New(
@@ -189,6 +189,13 @@ func main() {
 			},
 		},
 	}
+
+	f, err := os.OpenFile("logs.err", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0664)
+	if err != nil {
+		panic(err)
+	}
+
+	log.SetOutput(f)
 
 	if err := program.Run(context.Background(), os.Args); err != nil {
 		panic(err)
