@@ -11,11 +11,8 @@ import (
 	"soloboard/page"
 	"soloboard/sighandler"
 	"soloboard/stacknav"
-	"soloboard/utils"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/term"
 	"github.com/ggof/argparse"
 	"github.com/oklog/ulid/v2"
 

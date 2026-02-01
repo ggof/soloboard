@@ -27,7 +27,7 @@ type PageViewBoard struct {
 }
 
 func ViewBoard(db Database, boards []model.Board, i, width, height int) PageViewBoard {
-	sw := max(40, width/3)
+	sw := max(sectionWidth, width/3)
 
 	p := PageViewBoard{
 		Viewport: viewport.New(sw),
@@ -103,7 +103,6 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 			cmd = p.saveBoards()
 		case "K":
-
 			p.swapTask(p.I, p.columns[p.I].I, p.columns[p.I].I-1)
 			p.columns[p.I].Prev()
 			cmd = p.saveBoards()
@@ -112,6 +111,7 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.columns[p.I].Next()
 			cmd = p.saveBoards()
 		case "x":
+			// TODO: add some kind of "are you sure?" modal
 			if len(p.boards[p.i].Sections[p.I].Tasks) == 0 {
 				break
 			}
@@ -119,6 +119,7 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
 			cmd = p.saveBoards()
 		case "X":
+			// TODO: add some kind of "are you sure?" modal
 			p.boards[p.i].Sections = slices.Delete(p.boards[p.i].Sections, p.I, p.I+1)
 			p.columns = slices.Delete(p.columns, p.I, p.I+1)
 			p.SetLen(len(p.boards[p.i].Sections))
@@ -137,7 +138,6 @@ func (p PageViewBoard) handleColumnOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 		vp := viewport.New(2 + 3)   // allow 3 lines of text per task
 		vp.SetSize(p.h - 3 - 3 - 2) // 3 lines for title, 3 lines for col title, 2 lines for borders
-		vp.SetLen(0)
 
 		p.columns = append(p.columns, viewport.New(sectionWidth))
 		p.columnOverlay = false
@@ -236,6 +236,7 @@ func (p *PageViewBoard) moveTask(si, sj, i int) {
 
 	p.boards[p.i].Sections[si].Tasks = slices.Delete(p.boards[p.i].Sections[si].Tasks, i, i+1)
 	p.boards[p.i].Sections[sj].Tasks = append(p.boards[p.i].Sections[sj].Tasks, task)
+	p.columns[sj].I = len(p.boards[p.i].Sections[sj].Tasks) // select new place by default
 }
 
 func (p PageViewBoard) saveBoards() tea.Cmd {

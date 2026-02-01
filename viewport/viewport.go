@@ -2,7 +2,6 @@ package viewport
 
 import (
 	"iter"
-	"log"
 )
 
 type Viewport struct {
@@ -59,7 +58,6 @@ func (v *Viewport) SetSize(size int) {
 }
 
 func (v *Viewport) SetLen(length int) {
-	log.Printf("prev len: %d\tnext len: %d", v.len, length)
 	v.len = length
 	v.updateViewportSize()
 }
