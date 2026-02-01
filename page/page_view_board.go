@@ -82,33 +82,28 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "k":
 			p.columns[p.I].Prev()
 		case "H":
-			oldcol := p.I
+			if p.I == 0 || len(p.boards[p.i].Sections[p.I].Tasks) == 0 {
+				break
+			}
+
 			p.moveTask(p.I, p.I-1, p.columns[p.I].I)
 			p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
-			if p.columns[p.I].I == len(p.boards[p.i].Sections[p.I].Tasks) {
-				p.columns[p.I].I--
-			}
+			p.columns[p.I-1].SetLen(len(p.boards[p.i].Sections[p.I-1].Tasks))
 			p.Prev()
-			if oldcol != p.I {
-				p.columns[p.I].I = len(p.boards[p.i].Sections[p.I].Tasks) - 1
-				p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
-			}
+
 			cmd = p.saveBoards()
 		case "L":
-			oldcol := p.I
+			if p.I+1 == len(p.currentBoard().Sections) || len(p.boards[p.i].Sections[p.I].Tasks) == 0 {
+				break
+			}
 			p.moveTask(p.I, p.I+1, p.columns[p.I].I)
-			if p.columns[p.I].I == len(p.boards[p.i].Sections[p.I].Tasks) {
-				p.columns[p.I].I--
-			}
 			p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
+			p.columns[p.I+1].SetLen(len(p.boards[p.i].Sections[p.I+1].Tasks))
 			p.Next()
-			if oldcol != p.I {
-				p.columns[p.I].I = len(p.boards[p.i].Sections[p.I].Tasks) - 1
-				p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
-			}
 
 			cmd = p.saveBoards()
 		case "K":
+
 			p.swapTask(p.I, p.columns[p.I].I, p.columns[p.I].I-1)
 			p.columns[p.I].Prev()
 			cmd = p.saveBoards()
@@ -116,12 +111,18 @@ func (p PageViewBoard) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			p.swapTask(p.I, p.columns[p.I].I, p.columns[p.I].I+1)
 			p.columns[p.I].Next()
 			cmd = p.saveBoards()
+		case "x":
+			if len(p.boards[p.i].Sections[p.I].Tasks) == 0 {
+				break
+			}
+			p.boards[p.i].Sections[p.I].Tasks = slices.Delete(p.boards[p.i].Sections[p.I].Tasks, p.columns[p.I].I, p.columns[p.I].I+1)
+			p.columns[p.I].SetLen(len(p.boards[p.i].Sections[p.I].Tasks))
+			cmd = p.saveBoards()
 		case "X":
 			p.boards[p.i].Sections = slices.Delete(p.boards[p.i].Sections, p.I, p.I+1)
+			p.columns = slices.Delete(p.columns, p.I, p.I+1)
 			p.SetLen(len(p.boards[p.i].Sections))
-			if p.I == len(p.boards[p.i].Sections) {
-				p.Prev()
-			}
+			cmd = p.saveBoards()
 		}
 	}
 	return p, cmd
@@ -133,15 +134,19 @@ func (p PageViewBoard) handleColumnOverlay(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	switch {
 	case key == "enter":
 		p.boards[p.i].Sections = append(p.boards[p.i].Sections, model.NewSection(p.newColumnName))
+
+		vp := viewport.New(2 + 3)   // allow 3 lines of text per task
+		vp.SetSize(p.h - 3 - 3 - 2) // 3 lines for title, 3 lines for col title, 2 lines for borders
+		vp.SetLen(0)
+
+		p.columns = append(p.columns, viewport.New(sectionWidth))
 		p.columnOverlay = false
 		p.newColumnName = ""
-		p.I = len(p.currentBoard().Sections) - 1
-		p.SetLen(len(p.currentBoard().Sections))
+		p.SetLen(len(p.boards[p.i].Sections))
+		p.GoTo(len(p.currentBoard().Sections) - 1)
 		cmd = p.saveBoards()
-	case key == "backspace":
-		if p.newColumnName != "" {
-			p.newColumnName = p.newColumnName[:len(p.newColumnName)-1]
-		}
+	case key == "backspace" && len(p.newColumnName) > 0:
+		p.newColumnName = p.newColumnName[:len(p.newColumnName)-1]
 	case len(key) == 1:
 		p.newColumnName += key
 	case key == "esc":
@@ -215,7 +220,7 @@ func (p PageViewBoard) newColumnOverlay() string {
 }
 
 func (p *PageViewBoard) swapTask(s, i, j int) {
-	if j < 0 || j == len(p.boards[p.i].Sections[s].Tasks) {
+	if j < 0 || j >= len(p.boards[p.i].Sections[s].Tasks) {
 		return
 	}
 

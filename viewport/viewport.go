@@ -2,6 +2,7 @@ package viewport
 
 import (
 	"iter"
+	"log"
 )
 
 type Viewport struct {
@@ -19,29 +20,37 @@ func New(itemSize int) Viewport {
 }
 
 func (v *Viewport) Prev() {
-	if v.I > 0 {
-		v.I--
+	if v.I <= 0 {
+		return
+	}
+	v.I--
 
-		for v.I < v.beg {
-			v.beg--
-			for v.end-v.beg > v.max {
-				v.end--
-			}
-		}
+	for v.I < v.beg {
+		v.beg--
+	}
+	for v.end-v.beg > v.max {
+		v.end--
 	}
 }
 
 func (v *Viewport) Next() {
-	if v.I < v.len-1 {
-		v.I++
-
-		for v.I >= v.end {
-			v.end++
-			for v.end-v.beg > v.max {
-				v.beg++
-			}
-		}
+	if v.I >= v.len-1 {
+		return
 	}
+	v.I++
+
+	for v.I >= v.end {
+		v.end++
+	}
+
+	for v.end-v.beg > v.max {
+		v.beg++
+	}
+}
+
+func (v *Viewport) GoTo(i int) {
+	v.I = i
+	v.updateViewportSize()
 }
 
 func (v *Viewport) SetSize(size int) {
@@ -50,6 +59,7 @@ func (v *Viewport) SetSize(size int) {
 }
 
 func (v *Viewport) SetLen(length int) {
+	log.Printf("prev len: %d\tnext len: %d", v.len, length)
 	v.len = length
 	v.updateViewportSize()
 }
@@ -64,6 +74,7 @@ func (v *Viewport) updateViewportSize() {
 
 	v.max = max(1, v.size/(v.itemSize))
 
+	v.I = max(0, min(v.I, v.len-1))
 	v.beg = v.I
 	v.end = v.I
 	for i := range v.max {

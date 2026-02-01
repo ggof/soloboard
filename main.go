@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"log"
 	"os"
@@ -17,18 +16,53 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/term"
+	"github.com/ggof/argparse"
 	"github.com/oklog/ulid/v2"
 
-	// "github.com/charmbracelet/x/term"
 	"github.com/muesli/termenv"
-	"github.com/urfave/cli/v3"
 )
 
-type Env struct {
-	DB page.Database
+func main() {
+	p := argparse.NewParser("soloboard", "a simple TUI/CLI tool to manage your personal projects, KanBan-style.")
+
+	debug := p.Flag("d", "debug", &argparse.Options{Default: false})
+
+	cmdSeed := p.NewCommand("seed", "Create a test database (for debug purposes)")
+	if err := p.Parse(os.Args); err != nil {
+		fmt.Print(p.Usage(err))
+		os.Exit(1)
+	}
+
+	env := NewEnv(*debug)
+
+	if env.Debug {
+		f, err := os.OpenFile("logs.err", os.O_CREATE|os.O_TRUNC|os.O_RDWR, 0664)
+		if err != nil {
+			panic(err)
+		}
+
+		log.SetOutput(f)
+	}
+
+	var err error
+	switch {
+	case cmdSeed.Happened():
+		err = SeedDatabase(env)
+	default:
+		err = StartTUI(env)
+	}
+
+	if err != nil {
+		log.Fatalln(err)
+	}
 }
 
-func NewEnv() *Env {
+type Env struct {
+	DB    page.Database
+	Debug bool
+}
+
+func NewEnv(debug bool) *Env {
 	dbpath := os.ExpandEnv("$HOME/.local/share/soloboard")
 	if err := os.MkdirAll(dbpath, 0755); err != nil {
 		panic(err)
@@ -36,168 +70,107 @@ func NewEnv() *Env {
 
 	dbfilename := path.Join(dbpath, "boards.db")
 
-	return &Env{DB: db.NewBoardDatabase(dbfilename)}
+	return &Env{DB: db.NewBoardDatabase(dbfilename), Debug: debug}
 
 }
 
-func StartTUI(e *Env) cli.ActionFunc {
-	return func(ctx context.Context, c *cli.Command) error {
-		o := termenv.NewOutput(os.Stdout)
+func StartTUI(e *Env) error {
+	reset := setBaseColors()
+	defer reset()
 
-		bg := termenv.BackgroundColor()
-		fg := termenv.ForegroundColor()
-
-		defer func() {
-			o.SetBackgroundColor(bg)
-			o.SetForegroundColor(fg)
-			o.SetCursorColor(fg)
-			o.ClearScreen()
-		}()
-
-		o.SetBackgroundColor(termenv.ANSIBlack)
-		o.SetCursorColor(termenv.ANSIWhite)
-		o.SetForegroundColor(termenv.ANSIWhite)
-
-		// log.SetOutput(os.Stderr)
-
-		p := tea.NewProgram(
-			sighandler.New(
-				stacknav.New(
-					page.SelectBoard(e.DB),
-				),
+	p := tea.NewProgram(
+		sighandler.New(
+			stacknav.New(
+				page.SelectBoard(e.DB),
 			),
-			tea.WithoutCatchPanics())
-		_, err := p.Run()
+		),
+		tea.WithoutCatchPanics())
+	_, err := p.Run()
 
+	return err
+}
+
+func SeedDatabase(env *Env) error {
+	boards, err := env.DB.Read()
+	if err != nil {
 		return err
 	}
-}
 
-func ListBoards(e *Env) cli.ActionFunc {
-	return func(ctx context.Context, c *cli.Command) error {
-		boards, err := e.DB.Read()
-		if err != nil {
-			return err
-		}
 
-		w, _, err := term.GetSize(uintptr(os.Stdout.Fd()))
-		if err != nil {
-			return err
-		}
-
-		size := w / 2
-
-		parts := make([]string, len(boards)+1)
-		parts[0] = lipgloss.JoinHorizontal(lipgloss.Center,
-			lipgloss.PlaceHorizontal(size, lipgloss.Left, "ID"),
-			lipgloss.PlaceHorizontal(size, lipgloss.Left, "NAME"),
-		)
-		for i, b := range boards {
-			lipgloss.MarkdownBorder()
-			parts[i+1] = lipgloss.JoinHorizontal(lipgloss.Center,
-				lipgloss.PlaceHorizontal(size, lipgloss.Left, utils.EllipsisEnd(b.ID, size)),
-				lipgloss.PlaceHorizontal(size, lipgloss.Left, utils.EllipsisEnd(b.Name, size)),
-			)
-		}
-
-		fmt.Println(lipgloss.JoinVertical(lipgloss.Top, parts...))
-
-		return nil
-	}
-}
-
-func SeedDatabase(env *Env) cli.ActionFunc {
-	return func(ctx context.Context, c *cli.Command) error {
-		boards, err := env.DB.Read()
-		if err != nil {
-			return err
-		}
-
-		seed := model.Board{
-			ID:   ulid.Make().String(),
-			Name: "seed",
-			Sections: []model.Section{
-				{
-					ID:   ulid.Make().String(),
-					Name: "TODO",
-					Tasks: []model.Task{
-						model.NewTask("t00", "lorem"),
-						model.NewTask("t01", "lorem"),
-						model.NewTask("t02", "lorem"),
-						model.NewTask("t03", "lorem"),
-						model.NewTask("t04", "lorem"),
-						model.NewTask("t05", "lorem"),
-						model.NewTask("t06", "lorem"),
-						model.NewTask("t07", "lorem"),
-						model.NewTask("t08", "lorem"),
-						model.NewTask("t09", "lorem"),
-					},
-				},
-				{
-					ID:   ulid.Make().String(),
-					Name: "IN PROGRESS",
-					Tasks: []model.Task{
-						model.NewTask("t10", "lorem"),
-					},
-				},
-				{
-					ID:   ulid.Make().String(),
-					Name: "DONE",
-					Tasks: []model.Task{
-						model.NewTask("t20", "lorem"),
-						model.NewTask("t21", "lorem"),
-						model.NewTask("t22", "lorem"),
-						model.NewTask("t23", "lorem"),
-						model.NewTask("t24", "lorem"),
-						model.NewTask("t25", "lorem"),
-						model.NewTask("t26", "lorem"),
-						model.NewTask("t27", "lorem"),
-						model.NewTask("t28", "lorem"),
-						model.NewTask("t29", "lorem"),
-					},
+	seed := model.Board{
+		ID:   ulid.Make().String(),
+		Name: "seed",
+		Sections: []model.Section{
+			{
+				ID:   ulid.Make().String(),
+				Name: "TODO",
+				Tasks: []model.Task{
+					model.NewTask("t00", "lorem"),
+					model.NewTask("t01", "lorem"),
+					model.NewTask("t02", "lorem"),
+					model.NewTask("t03", "lorem"),
+					model.NewTask("t04", "lorem"),
+					model.NewTask("t05", "lorem"),
+					model.NewTask("t06", "lorem"),
+					model.NewTask("t07", "lorem"),
+					model.NewTask("t08", "lorem"),
+					model.NewTask("t09", "lorem"),
 				},
 			},
-		}
-
-		for i, b := range boards {
-			if b.Name == seed.Name {
-				boards = slices.Delete(boards, i, i+1)
-			}
-		}
-
-		boards = append(boards, seed)
-
-		return env.DB.Write(boards)
-	}
-}
-
-func main() {
-	env := NewEnv()
-
-	program := cli.Command{
-		Action: StartTUI(env),
-		Commands: []*cli.Command{
 			{
-				Name:        "list",
-				Description: "List the current boards",
-				Action:      ListBoards(env),
+				ID:   ulid.Make().String(),
+				Name: "IN PROGRESS",
+				Tasks: []model.Task{
+					model.NewTask("t10", "lorem"),
+				},
 			},
 			{
-				Name:        "seed",
-				Description: "Create a test database (for debug purposes)",
-				Action:      SeedDatabase(env),
+				ID:   ulid.Make().String(),
+				Name: "DONE",
+				Tasks: []model.Task{
+					model.NewTask("t20", "lorem"),
+					model.NewTask("t21", "lorem"),
+					model.NewTask("t22", "lorem"),
+					model.NewTask("t23", "lorem"),
+					model.NewTask("t24", "lorem"),
+					model.NewTask("t25", "lorem"),
+					model.NewTask("t26", "lorem"),
+					model.NewTask("t27", "lorem"),
+					model.NewTask("t28", "lorem"),
+					model.NewTask("t29", "lorem"),
+				},
 			},
 		},
 	}
 
-	f, err := os.OpenFile("logs.err", os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0664)
-	if err != nil {
-		panic(err)
+	log.Println("read database completed.")
+
+	for i, b := range boards {
+		if b.Name == seed.Name {
+			boards = slices.Delete(boards, i, i+1)
+			log.Println("removed old seed database.")
+		}
 	}
 
-	log.SetOutput(f)
+	boards = append(boards, seed)
 
-	if err := program.Run(context.Background(), os.Args); err != nil {
-		panic(err)
+	return env.DB.Write(boards)
+}
+
+func setBaseColors() func() {
+	o := termenv.NewOutput(os.Stdout)
+	bg := termenv.BackgroundColor()
+	fg := termenv.ForegroundColor()
+
+	o.SetBackgroundColor(termenv.ANSIBlack)
+	o.SetCursorColor(termenv.ANSIWhite)
+	o.SetForegroundColor(termenv.ANSIWhite)
+	o.ClearScreen()
+
+	return func() {
+		o.SetBackgroundColor(bg)
+		o.SetForegroundColor(fg)
+		o.SetCursorColor(fg)
+		o.ClearScreen()
 	}
 }
